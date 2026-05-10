@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Golden Guild</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="The Golden Guild home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 64 64" role="img">
+              <path d="M32 6 55 17v16c0 14.5-9.6 22.7-23 27-13.4-4.3-23-12.5-23-27V17L32 6Z" />
+              <path d="M20 28h24M24 21h16M25 36h14" />
+              <path d="M32 19v24" />
+            </svg>
+          </span>
+          <span>
+            <strong>The Golden Guild</strong>
+            <small>notes, essays, dispatches</small>
+          </span>
+        </a>
+
+        <nav aria-label="Primary">
+          <button class="nav-link active" data-view="feed" type="button">Library</button>
+          <button class="nav-link" data-view="write" type="button">Write</button>
+          <button class="nav-link" data-view="members" type="button">Members</button>
+        </nav>
+
+        <div class="account-area" id="accountArea"></div>
+      </header>
+
+      <main>
+        <section class="hero-band">
+          <div class="hero-copy">
+            <p class="eyebrow">A private journal hall</p>
+            <h1>The Golden Guild</h1>
+            <p>
+              Short-form essays from your circle, gathered in one calm reading room.
+            </p>
+          </div>
+          <div class="hero-panel" aria-label="Site snapshot">
+            <div>
+              <span id="postCount">0</span>
+              <small>published pieces</small>
+            </div>
+            <div>
+              <span id="memberCount">0</span>
+              <small>guild writers</small>
+            </div>
+          </div>
+        </section>
+
+        <section class="toolbar" aria-label="Blog tools">
+          <label class="search-field">
+            <span>Search</span>
+            <input id="searchInput" type="search" placeholder="Find a title, author, or phrase" />
+          </label>
+          <label class="select-field">
+            <span>Sort</span>
+            <select id="sortSelect">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="author">Author</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="view active" id="feedView" aria-labelledby="feedHeading">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Library</p>
+              <h2 id="feedHeading">Recent writing</h2>
+            </div>
+            <button class="primary-action" id="quickWriteButton" type="button">New post</button>
+          </div>
+          <div class="post-grid" id="postGrid"></div>
+          <div class="empty-state hidden" id="emptyState">
+            <h3>No essays found</h3>
+            <p>Try a different search, or be the first to post something worth passing around.</p>
+          </div>
+        </section>
+
+        <section class="view" id="writeView" aria-labelledby="writeHeading">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Compose</p>
+              <h2 id="writeHeading">Post to the guild</h2>
+            </div>
+          </div>
+          <form class="editor" id="postForm">
+            <label>
+              Title
+              <input id="titleInput" name="title" maxlength="90" required placeholder="A sharp title for a short thought" />
+            </label>
+            <label>
+              Essay
+              <textarea id="bodyInput" name="body" rows="10" required placeholder="Write a few paragraphs. Markdown is optional; plain text is welcome."></textarea>
+            </label>
+            <div class="editor-actions">
+              <p id="editorHint">Sign in to publish under your username.</p>
+              <button class="primary-action" type="submit">Publish</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="view" id="membersView" aria-labelledby="membersHeading">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Roster</p>
+              <h2 id="membersHeading">Guild members</h2>
+            </div>
+          </div>
+          <div class="member-list" id="memberList"></div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="authDialog">
+      <form class="auth-card" id="authForm" method="dialog">
+        <div class="auth-header">
+          <div>
+            <p class="eyebrow">Welcome</p>
+            <h2 id="authTitle">Sign in</h2>
+          </div>
+          <button class="icon-button" id="closeAuthButton" type="button" aria-label="Close">×</button>
+        </div>
+
+        <div class="segmented" role="tablist" aria-label="Authentication mode">
+          <button class="segment active" data-auth-mode="login" type="button">Log in</button>
+          <button class="segment" data-auth-mode="signup" type="button">Create account</button>
+        </div>
+
+        <label>
+          Username
+          <input id="usernameInput" autocomplete="username" minlength="2" maxlength="20" pattern="[A-Za-z0-9_-]+" required />
+        </label>
+        <label>
+          Password
+          <input id="passwordInput" type="password" autocomplete="current-password" minlength="4" required />
+        </label>
+        <p class="form-message" id="authMessage"></p>
+        <button class="primary-action" type="submit">Continue</button>
+      </form>
+    </dialog>
+
+    <template id="postTemplate">
+      <article class="post-card">
+        <div class="post-meta">
+          <span class="avatar"></span>
+          <span class="author"></span>
+          <time></time>
+        </div>
+        <h3></h3>
+        <p></p>
+        <button class="text-button" type="button">Read essay</button>
+      </article>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
