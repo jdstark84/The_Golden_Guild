@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>The Golden Guild</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=medieval-guild" />
   </head>
   <body>
     <div class="app-shell">
@@ -19,7 +19,7 @@
           </span>
           <span>
             <strong>The Golden Guild</strong>
-            <small>notes, essays, dispatches</small>
+            <small>essays of the fellowship</small>
           </span>
         </a>
 
@@ -35,20 +35,20 @@
       <main>
         <section class="hero-band">
           <div class="hero-copy">
-            <p class="eyebrow">A private journal hall</p>
+            <p class="eyebrow">The house ledger</p>
             <h1>The Golden Guild</h1>
             <p>
-              Short-form essays from your circle, gathered in one calm reading room.
+              Essays, arguments, and field notes from the fellowship, kept in one handsome archive.
             </p>
           </div>
           <div class="hero-panel" aria-label="Site snapshot">
             <div>
               <span id="postCount">0</span>
-              <small>published pieces</small>
+              <small>entries sealed</small>
             </div>
             <div>
               <span id="memberCount">0</span>
-              <small>guild writers</small>
+              <small>sworn writers</small>
             </div>
           </div>
         </section>
@@ -56,7 +56,7 @@
         <section class="toolbar" aria-label="Blog tools">
           <label class="search-field">
             <span>Search</span>
-            <input id="searchInput" type="search" placeholder="Find a title, author, or phrase" />
+            <input id="searchInput" type="search" placeholder="Search the archive" />
           </label>
           <label class="select-field">
             <span>Sort</span>
@@ -72,9 +72,9 @@
           <div class="section-heading">
             <div>
               <p class="eyebrow">Library</p>
-              <h2 id="feedHeading">Recent writing</h2>
+              <h2 id="feedHeading">Latest entries</h2>
             </div>
-            <button class="primary-action" id="quickWriteButton" type="button">New post</button>
+            <button class="primary-action" id="quickWriteButton" type="button">Inscribe</button>
           </div>
           <div class="post-grid" id="postGrid"></div>
           <div class="empty-state hidden" id="emptyState">
@@ -87,21 +87,21 @@
           <div class="section-heading">
             <div>
               <p class="eyebrow">Compose</p>
-              <h2 id="writeHeading">Post to the guild</h2>
+              <h2 id="writeHeading">Inscribe an entry</h2>
             </div>
           </div>
           <form class="editor" id="postForm">
             <label>
               Title
-              <input id="titleInput" name="title" maxlength="90" required placeholder="A sharp title for a short thought" />
+              <input id="titleInput" name="title" maxlength="90" required placeholder="Title your entry" />
             </label>
             <label>
               Essay
-              <textarea id="bodyInput" name="body" rows="10" required placeholder="Write a few paragraphs. Markdown is optional; plain text is welcome."></textarea>
+              <textarea id="bodyInput" name="body" rows="10" required placeholder="Write a few considered paragraphs."></textarea>
             </label>
             <div class="editor-actions">
               <p id="editorHint">Sign in to publish under your username.</p>
-              <button class="primary-action" type="submit">Publish</button>
+              <button class="primary-action" type="submit">Seal entry</button>
             </div>
           </form>
         </section>
@@ -110,7 +110,7 @@
           <div class="section-heading">
             <div>
               <p class="eyebrow">Roster</p>
-              <h2 id="membersHeading">Guild members</h2>
+              <h2 id="membersHeading">Guild roster</h2>
             </div>
           </div>
           <div class="member-list" id="memberList"></div>
@@ -159,6 +159,8 @@
       </article>
     </template>
 
-    <script src="app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="app.js?v=supabase-ready"></script>
   </body>
 </html>

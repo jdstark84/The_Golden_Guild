@@ -1,4 +1,5 @@
 const STORAGE_KEY = "goldenGuildState";
+const USERNAME_EMAIL_DOMAIN = "goldenguild.local";
 
 const seedState = {
   currentUser: null,
@@ -32,8 +33,15 @@ const seedState = {
   ],
 };
 
+const supabaseSettings = window.GOLDEN_GUILD_SUPABASE ?? {};
+const hasSupabaseConfig = Boolean(supabaseSettings.url && supabaseSettings.anonKey && window.supabase);
+const db = hasSupabaseConfig
+  ? window.supabase.createClient(supabaseSettings.url, supabaseSettings.anonKey)
+  : null;
+
 let state = loadState();
 let authMode = "login";
+let isLoading = false;
 
 const accountArea = document.querySelector("#accountArea");
 const authDialog = document.querySelector("#authDialog");
@@ -53,22 +61,91 @@ const editorHint = document.querySelector("#editorHint");
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
-  if (!saved) return seedState;
+  if (!saved) return structuredClone(seedState);
 
   try {
     const parsed = JSON.parse(saved);
     return {
       currentUser: parsed.currentUser ?? null,
+      currentUserId: parsed.currentUserId ?? null,
       users: parsed.users?.length ? parsed.users : seedState.users,
       posts: parsed.posts?.length ? parsed.posts : seedState.posts,
     };
   } catch {
-    return seedState;
+    return structuredClone(seedState);
   }
 }
 
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (!hasSupabaseConfig) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+}
+
+async function initializeApp() {
+  if (hasSupabaseConfig) {
+    await loadSupabaseState();
+    db.auth.onAuthStateChange(() => {
+      loadSupabaseState();
+    });
+  }
+
+  wireEvents();
+  render();
+}
+
+async function loadSupabaseState() {
+  isLoading = true;
+  render();
+
+  const { data: sessionData } = await db.auth.getSession();
+  const userId = sessionData.session?.user?.id ?? null;
+  let currentUsername = null;
+
+  if (userId) {
+    const { data: profile } = await db
+      .from("profiles")
+      .select("username")
+      .eq("id", userId)
+      .maybeSingle();
+    currentUsername = profile?.username ?? null;
+  }
+
+  const [{ data: profiles, error: profilesError }, { data: posts, error: postsError }] =
+    await Promise.all([
+      db.from("profiles").select("id, username, created_at").order("username"),
+      db
+        .from("posts")
+        .select("id, title, body, created_at, profiles(username)")
+        .order("created_at", { ascending: false }),
+    ]);
+
+  if (profilesError || postsError) {
+    authMessage.textContent = "Supabase is connected, but the database tables are not ready yet.";
+    isLoading = false;
+    render();
+    return;
+  }
+
+  state = {
+    currentUser: currentUsername,
+    currentUserId: userId,
+    users: (profiles ?? []).map((profile) => ({
+      id: profile.id,
+      username: profile.username,
+      joinedAt: profile.created_at,
+    })),
+    posts: (posts ?? []).map((post) => ({
+      id: post.id,
+      title: post.title,
+      body: post.body,
+      author: post.profiles?.username ?? "Unknown",
+      createdAt: post.created_at,
+    })),
+  };
+
+  isLoading = false;
+  render();
 }
 
 function setView(viewName) {
@@ -83,7 +160,9 @@ function setView(viewName) {
 function openAuth(mode = "login") {
   authMode = mode;
   updateAuthMode();
-  authMessage.textContent = "";
+  authMessage.textContent = hasSupabaseConfig
+    ? "Use a username and password. No email address needed."
+    : "Prototype mode: this account only saves in this browser.";
   authForm.reset();
   authDialog.showModal();
   usernameInput.focus();
@@ -101,6 +180,10 @@ function getUser(username) {
   return state.users.find((user) => user.username.toLowerCase() === username.toLowerCase());
 }
 
+function usernameToEmail(username) {
+  return `${username.trim().toLowerCase()}@${USERNAME_EMAIL_DOMAIN}`;
+}
+
 function initials(username) {
   return username.trim().slice(0, 1).toUpperCase();
 }
@@ -116,6 +199,14 @@ function formatDate(dateString) {
 function renderAccount() {
   accountArea.replaceChildren();
 
+  if (isLoading) {
+    const loading = document.createElement("span");
+    loading.className = "user-pill";
+    loading.textContent = "Opening ledger...";
+    accountArea.append(loading);
+    return;
+  }
+
   if (state.currentUser) {
     const pill = document.createElement("span");
     pill.className = "user-pill";
@@ -130,11 +221,7 @@ function renderAccount() {
     logout.className = "secondary-action";
     logout.type = "button";
     logout.textContent = "Log out";
-    logout.addEventListener("click", () => {
-      state.currentUser = null;
-      saveState();
-      render();
-    });
+    logout.addEventListener("click", handleLogout);
 
     accountArea.append(pill, logout);
     return;
@@ -194,7 +281,7 @@ function renderPosts() {
     postGrid.append(node);
   });
 
-  emptyState.classList.toggle("hidden", posts.length > 0);
+  emptyState.classList.toggle("hidden", posts.length > 0 || isLoading);
   document.querySelector("#postCount").textContent = state.posts.length;
 }
 
@@ -235,7 +322,7 @@ function escapeHtml(value) {
 }
 
 function authorColor(author) {
-  const colors = ["#275846", "#283e61", "#8f3f4a", "#8d5f12"];
+  const colors = ["#275846", "#75312f", "#8f641d", "#4d1f1d"];
   const total = [...author].reduce((sum, letter) => sum + letter.charCodeAt(0), 0);
   return colors[total % colors.length];
 }
@@ -264,9 +351,9 @@ function renderMembers() {
 
 function renderEditor() {
   const button = postForm.querySelector("button[type='submit']");
-  button.disabled = !state.currentUser;
+  button.disabled = !state.currentUser || isLoading;
   editorHint.textContent = state.currentUser
-    ? `Publishing as ${state.currentUser}.`
+    ? `Sealing entries as ${state.currentUser}.`
     : "Sign in to publish under your username.";
 }
 
@@ -277,26 +364,43 @@ function render() {
   renderEditor();
 }
 
-document.querySelectorAll(".nav-link").forEach((button) => {
-  button.addEventListener("click", () => setView(button.dataset.view));
-});
-
-document.querySelector("#quickWriteButton").addEventListener("click", () => setView("write"));
-
-document.querySelector("#closeAuthButton").addEventListener("click", () => authDialog.close());
-
-document.querySelectorAll(".segment").forEach((button) => {
-  button.addEventListener("click", () => {
-    authMode = button.dataset.authMode;
-    authMessage.textContent = "";
-    updateAuthMode();
+function wireEvents() {
+  document.querySelectorAll(".nav-link").forEach((button) => {
+    button.addEventListener("click", () => setView(button.dataset.view));
   });
-});
 
-authForm.addEventListener("submit", (event) => {
+  document.querySelector("#quickWriteButton").addEventListener("click", () => setView("write"));
+
+  document.querySelector("#closeAuthButton").addEventListener("click", () => authDialog.close());
+
+  document.querySelectorAll(".segment").forEach((button) => {
+    button.addEventListener("click", () => {
+      authMode = button.dataset.authMode;
+      authMessage.textContent = "";
+      updateAuthMode();
+    });
+  });
+
+  authForm.addEventListener("submit", handleAuthSubmit);
+  postForm.addEventListener("submit", handlePostSubmit);
+  searchInput.addEventListener("input", renderPosts);
+  sortSelect.addEventListener("change", renderPosts);
+}
+
+async function handleAuthSubmit(event) {
   event.preventDefault();
   const username = usernameInput.value.trim();
   const password = passwordInput.value;
+
+  if (hasSupabaseConfig) {
+    await handleSupabaseAuth(username, password);
+    return;
+  }
+
+  handleLocalAuth(username, password);
+}
+
+function handleLocalAuth(username, password) {
   const existingUser = getUser(username);
 
   if (authMode === "signup") {
@@ -326,9 +430,80 @@ authForm.addEventListener("submit", (event) => {
   saveState();
   authDialog.close();
   render();
-});
+}
 
-postForm.addEventListener("submit", (event) => {
+async function handleSupabaseAuth(username, password) {
+  authMessage.textContent = "Checking the guild roll...";
+  const email = usernameToEmail(username);
+
+  if (authMode === "signup") {
+    const { data: existingProfile } = await db
+      .from("profiles")
+      .select("username")
+      .ilike("username", username)
+      .maybeSingle();
+
+    if (existingProfile) {
+      authMessage.textContent = "That username is already part of the guild.";
+      return;
+    }
+
+    const { data, error } = await db.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { username },
+      },
+    });
+
+    if (error) {
+      authMessage.textContent = error.message;
+      return;
+    }
+
+    if (!data.session) {
+      authMessage.textContent = "Account created. Check Supabase email settings if login is not immediate.";
+      return;
+    }
+
+    const { error: profileError } = await db.from("profiles").insert({
+      id: data.user.id,
+      username,
+    });
+
+    if (profileError) {
+      authMessage.textContent = profileError.message;
+      return;
+    }
+  } else {
+    const { error } = await db.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      authMessage.textContent = "Username or password did not match.";
+      return;
+    }
+  }
+
+  authDialog.close();
+  await loadSupabaseState();
+}
+
+async function handleLogout() {
+  if (hasSupabaseConfig) {
+    await db.auth.signOut();
+    await loadSupabaseState();
+    return;
+  }
+
+  state.currentUser = null;
+  saveState();
+  render();
+}
+
+async function handlePostSubmit(event) {
   event.preventDefault();
   if (!state.currentUser) {
     openAuth("login");
@@ -338,6 +513,24 @@ postForm.addEventListener("submit", (event) => {
   const title = document.querySelector("#titleInput").value.trim();
   const body = document.querySelector("#bodyInput").value.trim();
   if (!title || !body) return;
+
+  if (hasSupabaseConfig) {
+    const { error } = await db.from("posts").insert({
+      title,
+      body,
+      author_id: state.currentUserId,
+    });
+
+    if (error) {
+      editorHint.textContent = error.message;
+      return;
+    }
+
+    postForm.reset();
+    await loadSupabaseState();
+    setView("feed");
+    return;
+  }
 
   state.posts.unshift({
     id: crypto.randomUUID(),
@@ -351,9 +544,6 @@ postForm.addEventListener("submit", (event) => {
   postForm.reset();
   render();
   setView("feed");
-});
+}
 
-searchInput.addEventListener("input", renderPosts);
-sortSelect.addEventListener("change", renderPosts);
-
-render();
+initializeApp();
