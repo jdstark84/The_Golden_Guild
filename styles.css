@@ -326,8 +326,9 @@ textarea:focus {
 
 .post-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  max-width: 980px;
 }
 
 .post-card,
@@ -343,10 +344,15 @@ textarea:focus {
 }
 
 .post-card {
-  display: flex;
-  min-height: 280px;
-  flex-direction: column;
-  padding: 22px;
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  grid-template-areas:
+    "meta title"
+    "meta body"
+    "meta action";
+  gap: 12px 30px;
+  min-height: 0;
+  padding: 26px;
   position: relative;
 }
 
@@ -361,10 +367,19 @@ textarea:focus {
 
 .post-meta {
   display: flex;
-  gap: 8px;
-  align-items: center;
+  grid-area: meta;
+  gap: 10px;
+  align-items: flex-start;
+  align-self: start;
+  flex-wrap: wrap;
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.post-meta .author,
+.post-meta time {
+  display: block;
+  width: calc(100% - 42px);
 }
 
 .avatar {
@@ -380,23 +395,29 @@ textarea:focus {
 }
 
 .post-card h3 {
-  margin: 18px 0 10px;
+  grid-area: title;
+  margin: 0;
+  max-width: 760px;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.62rem;
-  line-height: 1.12;
+  font-size: clamp(1.65rem, 3vw, 2.4rem);
+  line-height: 1.08;
 }
 
 .post-card p {
   display: -webkit-box;
-  margin: 0 0 20px;
+  grid-area: body;
+  max-width: 76ch;
+  margin: 0 0 8px;
   overflow: hidden;
   color: #4b443b;
-  line-height: 1.58;
+  font-size: 1.06rem;
+  line-height: 1.68;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 5;
+  -webkit-line-clamp: 7;
 }
 
 .text-button {
+  grid-area: action;
   align-self: flex-start;
   margin-top: auto;
   padding: 9px 0;
@@ -521,11 +542,30 @@ dialog::backdrop {
 }
 
 .full-post {
-  max-width: 760px;
-  margin: 0 auto;
+  max-width: 980px;
+  margin: 0;
+  padding: 30px;
+  background:
+    linear-gradient(180deg, rgba(255, 250, 240, 0.94), rgba(243, 234, 214, 0.88));
+  border: 1px solid rgba(143, 100, 29, 0.28);
+  border-radius: 6px;
+  box-shadow: 0 12px 34px rgba(32, 24, 18, 0.1);
+}
+
+.full-post h2 {
+  max-width: 880px;
+  margin: 18px 0 22px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.1rem, 5vw, 4rem);
+  line-height: 1.02;
 }
 
 .full-post p {
+  max-width: 82ch;
+  margin: 0 0 28px;
+  color: #332a21;
+  font-size: clamp(1.08rem, 1.8vw, 1.22rem);
+  line-height: 1.78;
   white-space: pre-wrap;
 }
 
@@ -558,6 +598,22 @@ dialog::backdrop {
   .post-grid,
   .member-list {
     grid-template-columns: 1fr;
+  }
+
+  .post-card {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "meta"
+      "title"
+      "body"
+      "action";
+    gap: 14px;
+    padding: 22px;
+  }
+
+  .post-meta .author,
+  .post-meta time {
+    width: auto;
   }
 
   .section-heading,
