@@ -30,6 +30,16 @@ To make accounts and posts shared across devices:
 5. Paste them into `supabase-config.js`.
 6. Commit and push. Vercel will redeploy automatically.
 
+## Comments and Artwork
+
+The Supabase schema also adds:
+
+- `comments`: shared comments under each post.
+- `posts.image_url` and `posts.image_path`: optional artwork attached to posts.
+- `artwork`: a public Supabase Storage bucket for uploaded drawings and paintings.
+
+Run `supabase-schema.sql` again after pulling these changes. It is safe to run more than once.
+
 ## Prototype Notes
 
 - If `supabase-config.js` is empty, accounts and posts are stored in the browser with `localStorage`.

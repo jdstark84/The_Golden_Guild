@@ -21,6 +21,8 @@ const seedState = {
       title: "On Keeping Tiny Promises",
       body: "I keep thinking about how friendships are built less from grand gestures than from little remembered things: the book someone meant to read, the soup they like, the Tuesday they said would be hard. The tiny promise is a lantern. It does not light the whole road, but it lights enough.",
       author: "Mira",
+      imageUrl: "",
+      imagePath: "",
       createdAt: "2026-05-01T17:20:00.000Z",
     },
     {
@@ -28,9 +30,12 @@ const seedState = {
       title: "Notes From a Long Walk",
       body: "The city changes when you refuse to hurry through it. Every block becomes a paragraph. Every window has its own grammar. I walked home the long way and arrived with nothing solved, which was somehow exactly the point.",
       author: "Jonah",
+      imageUrl: "",
+      imagePath: "",
       createdAt: "2026-05-04T21:12:00.000Z",
     },
   ],
+  comments: [],
 };
 
 const supabaseSettings = window.GOLDEN_GUILD_SUPABASE ?? {};
@@ -58,6 +63,7 @@ const sortSelect = document.querySelector("#sortSelect");
 const emptyState = document.querySelector("#emptyState");
 const memberList = document.querySelector("#memberList");
 const editorHint = document.querySelector("#editorHint");
+const imageInput = document.querySelector("#imageInput");
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -70,6 +76,7 @@ function loadState() {
       currentUserId: parsed.currentUserId ?? null,
       users: parsed.users?.length ? parsed.users : seedState.users,
       posts: parsed.posts?.length ? parsed.posts : seedState.posts,
+      comments: parsed.comments ?? [],
     };
   } catch {
     return structuredClone(seedState);
@@ -111,16 +118,24 @@ async function loadSupabaseState() {
     currentUsername = profile?.username ?? null;
   }
 
-  const [{ data: profiles, error: profilesError }, { data: posts, error: postsError }] =
+  const [
+    { data: profiles, error: profilesError },
+    { data: posts, error: postsError },
+    { data: comments, error: commentsError },
+  ] =
     await Promise.all([
       db.from("profiles").select("id, username, created_at").order("username"),
       db
         .from("posts")
-        .select("id, title, body, created_at, profiles(username)")
+        .select("id, title, body, image_url, image_path, created_at, profiles(username)")
         .order("created_at", { ascending: false }),
+      db
+        .from("comments")
+        .select("id, post_id, body, created_at, profiles(username)")
+        .order("created_at", { ascending: true }),
     ]);
 
-  if (profilesError || postsError) {
+  if (profilesError || postsError || commentsError) {
     authMessage.textContent = "Supabase is connected, but the database tables are not ready yet.";
     isLoading = false;
     render();
@@ -140,7 +155,16 @@ async function loadSupabaseState() {
       title: post.title,
       body: post.body,
       author: post.profiles?.username ?? "Unknown",
+      imageUrl: post.image_url ?? "",
+      imagePath: post.image_path ?? "",
       createdAt: post.created_at,
+    })),
+    comments: (comments ?? []).map((comment) => ({
+      id: comment.id,
+      postId: comment.post_id,
+      body: comment.body,
+      author: comment.profiles?.username ?? "Unknown",
+      createdAt: comment.created_at,
     })),
   };
 
@@ -276,6 +300,15 @@ function renderPosts() {
     time.dateTime = post.createdAt;
     title.textContent = post.title;
     body.textContent = post.body;
+    if (post.imageUrl) {
+      const figure = document.createElement("figure");
+      figure.className = "post-artwork";
+      const image = document.createElement("img");
+      image.src = post.imageUrl;
+      image.alt = `Artwork attached to ${post.title}`;
+      figure.append(image);
+      body.after(figure);
+    }
     readButton.addEventListener("click", () => showFullPost(post));
     card.style.borderTop = `4px solid ${authorColor(post.author)}`;
     postGrid.append(node);
@@ -286,6 +319,7 @@ function renderPosts() {
 }
 
 function showFullPost(post) {
+  const comments = commentsForPost(post.id);
   const wrapper = document.createElement("div");
   wrapper.className = "full-post";
   wrapper.innerHTML = `
@@ -295,7 +329,46 @@ function showFullPost(post) {
       <time datetime="${post.createdAt}">${formatDate(post.createdAt)}</time>
     </div>
     <h2>${escapeHtml(post.title)}</h2>
+    ${post.imageUrl ? `<figure class="full-artwork"><img src="${escapeHtml(post.imageUrl)}" alt="Artwork attached to ${escapeHtml(post.title)}"></figure>` : ""}
     <p>${escapeHtml(post.body)}</p>
+    <section class="comments-section" aria-label="Comments">
+      <div class="comments-heading">
+        <div>
+          <p class="eyebrow">Marginalia</p>
+          <h3>${comments.length} ${comments.length === 1 ? "comment" : "comments"}</h3>
+        </div>
+      </div>
+      <div class="comment-list">
+        ${
+          comments.length
+            ? comments
+                .map(
+                  (comment) => `
+                    <article class="comment-card">
+                      <div class="post-meta">
+                        <span class="avatar">${initials(comment.author)}</span>
+                        <span>${escapeHtml(comment.author)}</span>
+                        <time datetime="${comment.createdAt}">${formatDate(comment.createdAt)}</time>
+                      </div>
+                      <p>${escapeHtml(comment.body)}</p>
+                    </article>
+                  `,
+                )
+                .join("")
+            : `<p class="quiet-note">No comments yet. Be the first to leave a note in the margin.</p>`
+        }
+      </div>
+      <form class="comment-form" data-post-id="${post.id}">
+        <label>
+          Add a comment
+          <textarea name="comment" rows="4" ${state.currentUser ? "" : "disabled"} placeholder="${state.currentUser ? "Leave a thoughtful note." : "Sign in to comment."}" required></textarea>
+        </label>
+        <div class="editor-actions">
+          <p>${state.currentUser ? `Commenting as ${escapeHtml(state.currentUser)}.` : "Sign in to comment."}</p>
+          <button class="primary-action" type="submit" ${state.currentUser ? "" : "disabled"}>Post comment</button>
+        </div>
+      </form>
+    </section>
   `;
 
   const closeButton = document.createElement("button");
@@ -306,7 +379,14 @@ function showFullPost(post) {
 
   postGrid.replaceChildren(wrapper);
   wrapper.append(closeButton);
+  wrapper.querySelector(".comment-form").addEventListener("submit", handleCommentSubmit);
   emptyState.classList.add("hidden");
+}
+
+function commentsForPost(postId) {
+  return state.comments
+    .filter((comment) => comment.postId === postId)
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 }
 
 function escapeHtml(value) {
@@ -512,13 +592,26 @@ async function handlePostSubmit(event) {
 
   const title = document.querySelector("#titleInput").value.trim();
   const body = document.querySelector("#bodyInput").value.trim();
+  const imageFile = imageInput.files?.[0] ?? null;
   if (!title || !body) return;
 
   if (hasSupabaseConfig) {
+    let imageUrl = "";
+    let imagePath = "";
+
+    if (imageFile) {
+      const uploadedImage = await uploadArtwork(imageFile);
+      if (!uploadedImage) return;
+      imageUrl = uploadedImage.url;
+      imagePath = uploadedImage.path;
+    }
+
     const { error } = await db.from("posts").insert({
       title,
       body,
       author_id: state.currentUserId,
+      image_url: imageUrl,
+      image_path: imagePath,
     });
 
     if (error) {
@@ -537,6 +630,8 @@ async function handlePostSubmit(event) {
     title,
     body,
     author: state.currentUser,
+    imageUrl: imageFile ? URL.createObjectURL(imageFile) : "",
+    imagePath: "",
     createdAt: new Date().toISOString(),
   });
 
@@ -544,6 +639,78 @@ async function handlePostSubmit(event) {
   postForm.reset();
   render();
   setView("feed");
+}
+
+async function uploadArtwork(file) {
+  if (!file.type.startsWith("image/")) {
+    editorHint.textContent = "Please choose an image file.";
+    return null;
+  }
+
+  const extension = file.name.split(".").pop()?.toLowerCase() || "png";
+  const path = `${state.currentUserId}/${crypto.randomUUID()}.${extension}`;
+  editorHint.textContent = "Uploading artwork...";
+
+  const { error } = await db.storage.from("artwork").upload(path, file, {
+    cacheControl: "3600",
+    upsert: false,
+    contentType: file.type,
+  });
+
+  if (error) {
+    editorHint.textContent = error.message;
+    return null;
+  }
+
+  const { data } = db.storage.from("artwork").getPublicUrl(path);
+  return {
+    path,
+    url: data.publicUrl,
+  };
+}
+
+async function handleCommentSubmit(event) {
+  event.preventDefault();
+  if (!state.currentUser) {
+    openAuth("login");
+    return;
+  }
+
+  const form = event.currentTarget;
+  const postId = form.dataset.postId;
+  const textarea = form.querySelector("textarea");
+  const body = textarea.value.trim();
+  if (!body) return;
+
+  if (hasSupabaseConfig) {
+    const { error } = await db.from("comments").insert({
+      post_id: postId,
+      author_id: state.currentUserId,
+      body,
+    });
+
+    if (error) {
+      form.querySelector(".editor-actions p").textContent = error.message;
+      return;
+    }
+
+    textarea.value = "";
+    await loadSupabaseState();
+    const post = state.posts.find((entry) => entry.id === postId);
+    if (post) showFullPost(post);
+    return;
+  }
+
+  state.comments.push({
+    id: crypto.randomUUID(),
+    postId,
+    body,
+    author: state.currentUser,
+    createdAt: new Date().toISOString(),
+  });
+  saveState();
+  const post = state.posts.find((entry) => entry.id === postId);
+  if (post) showFullPost(post);
 }
 
 initializeApp();
